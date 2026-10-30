@@ -1,17 +1,17 @@
-import React,{Children} from 'react'
+
 import SideNav from './component/NavBar'
 
-function Dashboardlayout({Children}) {
+function DashboardLayout({children}) {
   return (
-    <div>
-        <div>
+    <div className="flex min-h-screen bg-gray-50">
+        
             <SideNav/>
-        </div>
-        <div>
-            {Children}
+        
+        <div className="flex-1 p-6">
+            {children}
             </div>
     </div>
   )
 }
 
-export default Dashboardlayout
+export default DashboardLayout
