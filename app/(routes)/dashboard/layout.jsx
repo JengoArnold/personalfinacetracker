@@ -3,11 +3,12 @@ import SideNav from './component/NavBar'
 
 function DashboardLayout({children}) {
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div>
         
-            <SideNav/>
-        
-        <div className="flex-1 p-6">
+        <div className='fixed md:w-64 hidden md:block bg-white-400'> <SideNav/>
+         </div>
+           
+        <div className="md:ml-64  bg-green-700">
             {children}
             </div>
     </div>
