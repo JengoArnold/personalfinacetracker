@@ -1,4 +1,5 @@
 
+import DashboardHeader from './component/DashboardHeader'
 import SideNav from './component/NavBar'
 
 function DashboardLayout({children}) {
@@ -8,7 +9,8 @@ function DashboardLayout({children}) {
         <div className='fixed md:w-64 hidden md:block bg-white-400'> <SideNav/>
          </div>
            
-        <div className="md:ml-64  bg-green-700">
+        <div className="md:ml-64 p-7">
+          <DashboardHeader/>
             {children}
             </div>
     </div>
