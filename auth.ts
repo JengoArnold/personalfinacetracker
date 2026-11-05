@@ -3,7 +3,7 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import pool from "@/lib/database";
-import { RowDataPacket} from "mysql2";
+import { RowDataPacket } from "mysql2";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [Google],
@@ -97,7 +97,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     };
 
     // Only look up the database ID if it isn't already in the token
-    if (!dbToken.userId && token.email) {
+    if (dbToken.userId === undefined && token.email) {
 
         const [rows] = await pool.execute<RowDataPacket[]>(
             `SELECT id FROM users WHERE email = ? LIMIT 1`,
@@ -113,6 +113,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 },
 // session callback to include the database user ID in the session
 
+async session({ session, token }) {
+    const dbToken = token as typeof token & {
+        userId?: number;
+    };
+
+    if (session.user && dbToken.userId !== undefined) {
+        session.user.id = String(dbToken.userId);
+    }
+
+    return session;
+},
 
   },
 });
