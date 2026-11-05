@@ -90,5 +90,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       return baseUrl;
     },
+    // jwt callback to include the database user ID in the token
+    async jwt({ token }) {
+    const dbToken = token as typeof token & {
+        userId?: number;
+    };
+
+    // Only look up the database ID if it isn't already in the token
+    if (!dbToken.userId && token.email) {
+
+        const [rows] = await pool.execute<RowDataPacket[]>(
+            `SELECT id FROM users WHERE email = ? LIMIT 1`,
+            [token.email]
+        );
+
+        if (rows.length > 0) {
+            dbToken.userId = rows[0].id;
+        }
+    }
+
+    return token;
+},
+// session callback to include the database user ID in the session
+
+
   },
 });
