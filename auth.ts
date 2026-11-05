@@ -1,25 +1,26 @@
 
-
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import pool from "@/lib/database";
 import { RowDataPacket } from "mysql2";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  providers: [Google],
-  pages: {
-    signIn: "/signin",
-  },
-  callbacks: {
+    providers: [Google],
 
-    async signIn({ user, account }) {
+    pages: {
+        signIn: "/signin",
+    },
+
+    callbacks: {
+
+        // 1. GOOGLE SIGN-IN CALLBACK
+        async signIn({ user, account }) {
             try {
-                // Only process Google sign-ins
+                // Only allow Google sign-in
                 if (account?.provider !== "google") {
                     return false;
                 }
 
-                // Get the user's Google account information
                 const googleId = account.providerAccountId;
                 const email = user.email;
                 const name = user.name || "User";
@@ -28,7 +29,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     return false;
                 }
 
-                // Check whether this user already exists
+                // Check whether the user already exists
                 const [rows] = await pool.execute<RowDataPacket[]>(
                     `SELECT id, email, google_id
                      FROM users
@@ -41,7 +42,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     const existingUser = rows[0];
 
                     // Prevent linking a different Google account
-                    // to an existing email.
                     if (
                         existingUser.email !== email ||
                         (existingUser.google_id &&
@@ -50,7 +50,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                         return false;
                     }
 
-                    // Update the existing user
+                    // Update existing user
                     await pool.execute(
                         `UPDATE users
                          SET name = ?, google_id = ?
@@ -59,7 +59,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     );
 
                 } else {
-                    // Register a new user
+                    // Register new user
                     await pool.execute(
                         `INSERT INTO users (name, email, google_id)
                          VALUES (?, ?, ?)`,
@@ -70,60 +70,70 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 return true;
 
             } catch (error) {
-                console.error("Google user database synchronization failed:", error);
+                console.error(
+                    "Google user database synchronization failed:",
+                    error
+                );
+
                 return false;
             }
         },
 
-    
+        // 2. JWT CALLBACK
+        async jwt({ token }) {
+            const dbToken = token as typeof token & {
+                userId?: number;
+            };
 
-    async redirect({ url, baseUrl }) {
-      // Allow redirects to the same application.
-      if (url.startsWith("/")) {
-        return `${baseUrl}${url}`;
-      }
+            // Find the database ID if it is not already stored
+            if (dbToken.userId === undefined && token.email) {
 
-      // Allow redirects to the same origin.
-      if (new URL(url).origin === baseUrl) {
-        return url;
-      }
+                const [rows] = await pool.execute<RowDataPacket[]>(
+                    `SELECT id FROM users
+                     WHERE email = ?
+                     LIMIT 1`,
+                    [token.email]
+                );
 
-      return baseUrl;
+                if (rows.length > 0) {
+                    dbToken.userId = Number(rows[0].id);
+                }
+            }
+
+            return token;
+        },
+
+        // 3. SESSION CALLBACK
+        async session({ session, token }) {
+            const dbToken = token as typeof token & {
+                userId?: number;
+            };
+
+            // Add the database ID to the logged-in user
+            if (session.user && dbToken.userId !== undefined) {
+                Object.assign(session.user, {
+                    id: String(dbToken.userId),
+                });
+            }
+
+            return session;
+        },
+
+        // 4. REDIRECT CALLBACK
+        async redirect({ url, baseUrl }) {
+
+            // Allow redirects within the application
+            if (url.startsWith("/")) {
+                return `${baseUrl}${url}`;
+            }
+
+            // Allow redirects to the same origin
+            if (new URL(url).origin === baseUrl) {
+                return url;
+            }
+
+            return baseUrl;
+        },
+
     },
-    // jwt callback to include the database user ID in the token
-    async jwt({ token }) {
-    const dbToken = token as typeof token & {
-        userId?: number;
-    };
-
-    // Only look up the database ID if it isn't already in the token
-    if (dbToken.userId === undefined && token.email) {
-
-        const [rows] = await pool.execute<RowDataPacket[]>(
-            `SELECT id FROM users WHERE email = ? LIMIT 1`,
-            [token.email]
-        );
-
-        if (rows.length > 0) {
-            dbToken.userId = rows[0].id;
-        }
-    }
-
-    return token;
-},
-// session callback to include the database user ID in the session
-
-async session({ session, token }) {
-    const dbToken = token as typeof token & {
-        userId?: number;
-    };
-
-    if (session.user && dbToken.userId !== undefined) {
-        session.user.id = String(dbToken.userId);
-    }
-
-    return session;
-},
-
-  },
 });
