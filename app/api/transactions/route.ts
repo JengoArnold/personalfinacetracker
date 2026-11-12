@@ -11,4 +11,17 @@ export async function GET() {
             {status: 401 }
         );
     }
+  const userId = (
+    session.user as typeof session.user & { id: string }
+).id;
+
+const [rows] = await pool.execute(
+
+ `SELECT * FROM  transactions WHERE user_id = ?`,
+    [userId]
+);
+
+return NextResponse.json({
+    transactions:rows
+});
 }
